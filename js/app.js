@@ -13,64 +13,22 @@
 class AudioPlayer {
     constructor() {
         this.audio = new Audio('bell.mp3');
-        this.contextInitialized = false;
-        this.audioCtx = null;
     }
 
     /**
-     * Inicializa o contexto de áudio e filtros para boost de volume
-     * @private
-     */
-    _initContext() {
-        if (this.contextInitialized) return;
-
-        try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            this.audioCtx = new AudioContext();
-
-            // Cria a fonte de áudio a partir do elemento HTML
-            const source = this.audioCtx.createMediaElementSource(this.audio);
-
-            // Gain Node para Boost de Volume (300%)
-            const gainNode = this.audioCtx.createGain();
-            gainNode.gain.value = 3.0;
-
-            // Compressor para evitar distorção excessiva (clipping)
-            const compressor = this.audioCtx.createDynamicsCompressor();
-            compressor.threshold.value = -10;
-            compressor.knee.value = 40;
-            compressor.ratio.value = 12;
-            compressor.attack.value = 0;
-            compressor.release.value = 0.25;
-
-            // Conecta: Fonte -> Gain -> Compressor -> Saída
-            source.connect(gainNode);
-            gainNode.connect(compressor);
-            compressor.connect(this.audioCtx.destination);
-
-            this.contextInitialized = true;
-        } catch (e) {
-            console.error("Erro ao inicializar Web Audio API:", e);
-        }
-    }
-
-    /**
-     * Toca o som de chamada com volume maximizado
+     * Toca o som de chamada usando api padrão do HTML5
      * @public
      */
     playChamadaSound() {
         try {
-            this._initContext();
-
-            // Garante que o contexto esteja ativo (política de navegadores)
-            if (this.audioCtx && this.audioCtx.state === 'suspended') {
-                this.audioCtx.resume();
-            }
-
             this.audio.currentTime = 0;
-            this.audio.play().catch(error => {
-                console.warn('Erro ao reproduzir áudio:', error);
-            });
+            const playPromise = this.audio.play();
+
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.warn('Erro ao reproduzir áudio:', error);
+                });
+            }
         } catch (error) {
             console.error('Erro no player de áudio:', error);
         }
