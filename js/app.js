@@ -12,78 +12,68 @@
    ========================================================================== */
 class AudioPlayer {
     constructor() {
+        this.audio = new Audio('bell.mp3');
+        this.contextInitialized = false;
         this.audioCtx = null;
     }
 
     /**
-     * Inicializa o contexto de áudio
+     * Inicializa o contexto de áudio e filtros para boost de volume
      * @private
      */
     _initContext() {
-        if (!this.audioCtx) {
-            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (this.contextInitialized) return;
+
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.audioCtx = new AudioContext();
+
+            // Cria a fonte de áudio a partir do elemento HTML
+            const source = this.audioCtx.createMediaElementSource(this.audio);
+
+            // Gain Node para Boost de Volume (300%)
+            const gainNode = this.audioCtx.createGain();
+            gainNode.gain.value = 3.0;
+
+            // Compressor para evitar distorção excessiva (clipping)
+            const compressor = this.audioCtx.createDynamicsCompressor();
+            compressor.threshold.value = -10;
+            compressor.knee.value = 40;
+            compressor.ratio.value = 12;
+            compressor.attack.value = 0;
+            compressor.release.value = 0.25;
+
+            // Conecta: Fonte -> Gain -> Compressor -> Saída
+            source.connect(gainNode);
+            gainNode.connect(compressor);
+            compressor.connect(this.audioCtx.destination);
+
+            this.contextInitialized = true;
+        } catch (e) {
+            console.error("Erro ao inicializar Web Audio API:", e);
         }
     }
 
     /**
-    /**
-     * Toca uma nota melódica de alto volume (Otimizado para TV)
-     * @param {number} startTime - Tempo de início
-     * @param {number} frequency - Frequência em Hz
-     * @param {number} duration - Duração em segundos
-     * @private
-     */
-    _playMelodicNote(startTime, frequency, duration) {
-        const osc = this.audioCtx.createOscillator();
-        const gainNode = this.audioCtx.createGain();
-
-        // Compressor para maximizar volume sem distorcer (Loudness War style)
-        const compressor = this.audioCtx.createDynamicsCompressor();
-        compressor.threshold.setValueAtTime(-10, startTime);
-        compressor.knee.setValueAtTime(40, startTime);
-        compressor.ratio.setValueAtTime(12, startTime);
-        compressor.attack.setValueAtTime(0, startTime);
-        compressor.release.setValueAtTime(0.25, startTime);
-
-        // 'triangle' para som claro, 'sawtooth' seria ainda mais alto mas irritante
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(frequency, startTime);
-
-        // Volume "Boostado"
-        // O compressor vai segurar os picos, permitindo ganho > 1.0 percebido
-        gainNode.gain.setValueAtTime(0, startTime);
-        gainNode.gain.linearRampToValueAtTime(1.5, startTime + 0.05); // Gain 1.5 (muito alto)
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-
-        osc.connect(gainNode);
-        gainNode.connect(compressor);
-        compressor.connect(this.audioCtx.destination);
-
-        osc.start(startTime);
-        osc.stop(startTime + duration);
-    }
-
-    /**
-     * Toca o som de chamada: "Tan-Ta-Dan" (Tríade Ascendente)
-     * Volume: MÁXIMO
+     * Toca o som de chamada com volume maximizado
      * @public
      */
     playChamadaSound() {
-        this._initContext();
+        try {
+            this._initContext();
 
-        const now = this.audioCtx.currentTime;
+            // Garante que o contexto esteja ativo (política de navegadores)
+            if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume();
+            }
 
-        // Sequência "Aeroporto" Clássica (C Major Triad)
-        // Maior presença e volume
-
-        // Nota 1: "TAN" (C5 - 523Hz)
-        this._playMelodicNote(now, 523.25, 0.6);
-
-        // Nota 2: "TA" (E5 - 659Hz)
-        this._playMelodicNote(now + 0.5, 659.25, 0.3);
-
-        // Nota 3: "DAN" (G5 - 784Hz)
-        this._playMelodicNote(now + 0.7, 784.00, 1.2); // Nota final longa
+            this.audio.currentTime = 0;
+            this.audio.play().catch(error => {
+                console.warn('Erro ao reproduzir áudio:', error);
+            });
+        } catch (error) {
+            console.error('Erro no player de áudio:', error);
+        }
     }
 }
 
